@@ -1,0 +1,17 @@
+python -m train.alt_train_from_scratch --model_name VideoMAE-v2 \
+                                --num_classes 131 \
+                                --num_epochs 100 \
+                                --learning_rate 0.000002 \
+                                --batch_size 12 \
+                                --model_path /workspace/pytorch_gpu/sign_language_code/model_ckpts/VideoMAE-2-131-labels/model_epoch_10.pth \
+                                --train_data_path_1 /workspace/sign-language-data/data_cut_full_frames/val \
+                                --train_data_path_2 /workspace/sign-language-data/data_50_labels_full_frames/val \
+                                --validation_data_path_1 /workspace/sign-language-data/data_cut_full_frames/val \
+                                --validation_data_path_2 /workspace/sign-language-data/data_50_labels_full_frames/val \
+                                --warmup_steps 0.01 \
+                                --save_ckpt_every 100 \
+                                --save_ckpt_dir /workspace/pytorch_gpu/sign_language_code/model_ckpts/orthogonal-VideoMAE-2-131-labels \
+                                --accumulation_steps 3 \
+                                --class_balance true \
+                                --device cuda:0 \
+                                --use_wandb true     
