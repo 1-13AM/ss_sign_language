@@ -277,7 +277,7 @@ if __name__ == '__main__':
     train_dataset = FlexibleVideoDataset(root_dir = args.train_data_path, transform = transformations)
     val_dataset = FlexibleVideoDataset(root_dir = args.train_data_path, transform = transformations)
     
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, collate_fn=collate_fn, sampler = train_dataset.get_sampler())
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     
     # create optimizer
