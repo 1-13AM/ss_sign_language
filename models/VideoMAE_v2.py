@@ -6,8 +6,6 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 from timm.models.layers import drop_path, to_2tuple, trunc_normal_
 
-from .orthogonal import OrthogonalLinear
-
 
 def _cfg(url='', **kwargs):
     return {
@@ -500,41 +498,5 @@ class VideoMAEForClassification(nn.Module):
         x = self.head(x)
         return x
 
-class OrthogonalVideoMAEForClassification(VideoMAEForClassification):
-    def __init__(self, orthogonal_space_dim=1024, freeze_layers=True, **kwargs):
-        
-        super().__init__(**kwargs)
-        
-        self.orthogonal_space_dim = orthogonal_space_dim
-        self.orthogonal_linear = OrthogonalLinear(in_channels=self.embed_dim,
-                                                  output_channels=self.orthogonal_space_dim,
-                                                  use_bias=False)
-        self.head = nn.Linear(
-            self.orthogonal_space_dim, self.num_classes) if self.num_classes > 0 else nn.Identity()
-
-        self._init_weights(self.head)
-
-        if freeze_layers is True:
-            self.freeze()
-            
-    def freeze(self):
-        frozen_layers = ['patch_embed', 'pos_drop', 'blocks', 'norm', 'head_dropout']
-        for layer in frozen_layers:
-            getattr(self, layer).requires_grad_(False)
-            
-    def reset_classifier(self, weight, bias):
-        fitted_weight = torch.zeros(self.num_classes, self.orthogonal_space_dim)
-        fitted_weight[:, :self.embed_dim] = weight
-        fitted_bias = bias
-        with torch.no_grad():  # Disable gradients to modify weights
-            self.head.weight.copy_(fitted_weight)
-            self.head.bias.copy_(fitted_bias)
-        
-    def forward(self, x):
-        x = self.forward_features(x)
-        x = self.head_dropout(x)
-        x = self.orthogonal_linear(x)
-        x = self.head(x)
-        return x
 
 
