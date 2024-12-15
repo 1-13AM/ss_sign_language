@@ -22,7 +22,7 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def train_one_epoch(model, train_loader, optimizer, criterion, device, accumulation_steps, use_wandb, scheduler=None):
+def train_one_epoch(model, train_loader, optimizer, criterion, device, accumulation_steps, use_wandb):
     model.train()
     running_loss = 0.0
     optimizer.zero_grad()
@@ -51,8 +51,6 @@ def train_one_epoch(model, train_loader, optimizer, criterion, device, accumulat
             optimizer.step()
             optimizer.zero_grad()
             
-            if scheduler:
-                scheduler.step()
             if use_wandb:
                 # Log loss and learning rate
                 wandb.log({"batch_loss": accumulated_loss, "lr": optimizer.param_groups[0]['lr']})
@@ -63,7 +61,7 @@ def train_one_epoch(model, train_loader, optimizer, criterion, device, accumulat
 
 
 # Validation function with tqdm
-def validate_model(model, val_loader, criterion, device, use_wandb):
+def validate_model(model, val_loader, criterion, device):
     model.eval()
     running_loss = 0.0
     metric = Metrics(num_classes = 129, k = 3)
@@ -110,18 +108,19 @@ def train_model(model: torch.nn.Module,
         print(f"Epoch {epoch+1}/{epochs}")
         
         # Train for one epoch
-        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, accumulation_steps, use_wandb, scheduler)
+        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, accumulation_steps, use_wandb)
+        
         print(f"Training loss: {train_loss:.4f}")
 
         # Validation
         if val_loader is not None:
-            val_loss, perf = validate_model(model, val_loader, criterion, device, use_wandb)
+            val_loss, perf = validate_model(model, val_loader, criterion, device)
             print(f"Validation loss: {val_loss:.4f}")
             print(f"Validation accuracy: {perf['mean_accuracy']:.4f}")
             print(f"Validation F1: {perf['mean_f1']:.4f}")
             print(f"Validation Precision: {perf['mean_precision']:.4f}")
             print(f"Validation Recall: {perf['mean_recall']:.4f}")
-            # print(f"Validation Top-K Accuracy: {perf['top_k_accuracy']:.4f}")
+            print(f"Validation Top-K Accuracy: {perf['top_k_accuracy']:.4f}")
             
             if use_wandb:
                 # Log epoch-level metrics
@@ -133,7 +132,7 @@ def train_model(model: torch.nn.Module,
                            "val_f1": perf['mean_f1'],
                            "val_precision": perf['mean_precision'],
                            "val_recall": perf['mean_recall'],
-                        #    "val_top_k_accuracy": perf['top_k_accuracy'],
+                           "val_top_k_accuracy": perf['top_k_accuracy'],
                         }) 
         
         elif val_loader is None and use_wandb:
@@ -144,6 +143,10 @@ def train_model(model: torch.nn.Module,
                     'epoch': epoch + 1,
                     'model_state_dict': model.state_dict(),
                 }, f'{save_ckpt_dir}/model_epoch_{epoch + 1}.pth')
+
+        # schedule learning rate
+        if scheduler:
+            scheduler.step()
 
 
 if __name__ == '__main__':
@@ -298,7 +301,7 @@ if __name__ == '__main__':
     
     # create learning rate scheduler
     if args.scheduler == 'StepLR':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.75)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.75)
     elif args.scheduler == 'CosineAnnealingLR':
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0.001)
     elif args.scheduler == 'ReduceLROnPlateau':
