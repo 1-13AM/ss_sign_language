@@ -32,13 +32,9 @@ This script will download and rename the checkpoint parameters according to the 
 
 ### Frame Extraction
 
-1. Edit `scripts/extract_frames.sh`:
+Edit `scripts/extract_frames.sh`:
    - Replace `INPUT_FOLDER` with your video directory
    - Replace `OUTPUT_BASE_FOLDER` with your desired output frame directory
-   
-2. Run the frame extraction script twice:
-   - Once for the 50-label video dataset
-   - Once for the 83-label video dataset
 
 ```bash
 bash extract_frames.sh
@@ -60,10 +56,8 @@ Before running, modify the script parameters:
 
 1. Edit `scripts/videomae_v2.sh` with the following parameters:
    - `MODEL_PATH`: Path to the VideoMAE-v2 checkpoint
-   - `TRAIN_DATA_PATH_1`: Path to 83-label training frames
-   - `TRAIN_DATA_PATH_2`: Path to 50-label training frames
-   - `VAL_DATA_PATH_1`: Path to 83-label validation frames
-   - `VAL_DATA_PATH_2`: Path to 50-label validation frames
+   - `TRAIN_DATA_PATH`: Path to training data folder
+   - `VAL_DATA_PATH`: Path to validation data folder
 
 2. Start training:
 ```bash

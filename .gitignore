@@ -15,8 +15,8 @@ models/model_debugging.py
 models/orthogonal.py
 models/x3d.py
 
-/workspace/pytorch_gpu/sign_language_code/scripts/distillation.sh
-/workspace/pytorch_gpu/sign_language_code/scripts/orthogonal_videomae_v2.sh
+scripts/distillation.sh
+scripts/orthogonal_videomae_v2.sh
 
 train/alt_train_from_scratch.py
 train/last_layer_distillation.py

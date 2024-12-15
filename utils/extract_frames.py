@@ -1,115 +1,116 @@
-import cv2
 import os
-import concurrent.futures
-import tensorflow as tf
-import argparse
+import shutil
+from collections import defaultdict
+import random
+from typing import List, Dict, Tuple
 
-def center_crop(img, dim):
-    """Returns center cropped image.
+def split_dataset(
+    source_dir: str,
+    output_dir: str,
+    split_ratios: Tuple[float, float, float] = (0.8, 0.1, 0.1)
+) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Split a hierarchical video dataset into train/validation/test sets while maintaining class balance.
     
     Args:
-    img (numpy.ndarray): Image to be center cropped.
-    dim (tuple): Dimensions (width, height) to be cropped.
+        source_dir: Path to the source directory containing class folders
+        output_dir: Path to create the split dataset
+        split_ratios: Tuple of (train, validation, test) ratios that sum to 1.0
     
     Returns:
-    numpy.ndarray: The cropped image.
+        Dictionary containing the split information for each set
     """
-    width, height = img.shape[1], img.shape[0]
-    cropped_size = min(width, height)
-    mid_x, mid_y = width // 2, height // 2
-    cw2, ch2 = cropped_size // 2, cropped_size // 2
-    crop_img = img[mid_y - ch2:mid_y + ch2, mid_x - cw2:mid_x + cw2]
-    return crop_img
+    # Validate split ratios
+    if sum(split_ratios) != 1.0:
+        raise ValueError("Split ratios must sum to 1.0")
+    
+    # Create output directories
+    splits = ['train', 'validation', 'test']
+    for split in splits:
+        os.makedirs(os.path.join(output_dir, split), exist_ok=True)
+    
+    # Collect all class folders and their instance folders
+    class_instances = defaultdict(list)
+    for class_name in os.listdir(source_dir):
+        class_path = os.path.join(source_dir, class_name)
+        if os.path.isdir(class_path):
+            for instance in os.listdir(class_path):
+                instance_path = os.path.join(class_path, instance)
+                if os.path.isdir(instance_path):
+                    class_instances[class_name].append(instance)
+    
 
-def format_frames(frame, output_size):
-    frame = center_crop(frame, (1600,1600))
-    frame = tf.image.resize_with_pad(frame, *output_size)
-    return frame.numpy()
-
-def extract_frames_from_video(video_path, output_folder, num_frames=16):
-    video_name = os.path.basename(video_path).split('.')[0]
+    # Calculate split sizes for each class
+    split_counts = {}
+    split_assignments = defaultdict(lambda: defaultdict(list))
     
-    # Check if output folder exists and contains frames
-    if os.path.exists(output_folder):
-        existing_frames = [f for f in os.listdir(output_folder) if f.endswith('.jpg')]
-        if len(existing_frames) > 0:
-            print(f"Skipping {video_path} - frames already extracted")
-            return
-    
-    cap = cv2.VideoCapture(video_path)
-    
-    if not cap.isOpened():
-        print(f"Error opening video file {video_path}")
-        return
-    
-    # Create output folder for the current video
-    os.makedirs(output_folder, exist_ok=True)
-    
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    step = 1
-    
-    frame_count = 0
-    extracted_count = 0
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
+    for class_name, instances in class_instances.items():
+        n_instances = len(instances)
+        split_counts[class_name] = {
+            'train': int(n_instances * split_ratios[0]),
+            'validation': int(n_instances * split_ratios[1]),
+            'test': int(n_instances * split_ratios[2])
+        }
         
-        if not ret:
-            break
+        # Adjust for rounding errors
+        total = sum(split_counts[class_name].values())
+        if total < n_instances:
+            split_counts[class_name]['train'] += n_instances - total
         
-        if frame_count % step == 0:
-            frame_file = os.path.join(output_folder, f"{video_name}_frame{extracted_count + 1}.jpg")
-            frame = format_frames(frame, (224,224))
-            cv2.imwrite(frame_file, frame)
-            extracted_count += 1
+        # Randomly assign instances to splits
+        shuffled_instances = instances.copy()
+        random.shuffle(shuffled_instances)
         
-        frame_count += 1
+        current_idx = 0
+        for split, count in split_counts[class_name].items():
+            split_instances = shuffled_instances[current_idx:current_idx + count]
+            split_assignments[split][class_name].extend(split_instances)
+            current_idx += count
     
-    cap.release()
-    print(f"Successfully extracted {extracted_count} frames from {video_path}")
-
-def process_single_video(video_path, input_folder, output_base_folder, num_frames):
-    relative_path = os.path.relpath(video_path, input_folder)
-    video_output_folder = os.path.join(output_base_folder, os.path.splitext(relative_path)[0])
-    extract_frames_from_video(video_path, video_output_folder, num_frames)
-
-def process_videos_in_structure(input_folder, output_base_folder, num_frames=16):
-    video_paths = []
+    # Copy files to their new locations
+    for split in splits:
+        for class_name in class_instances.keys():
+            # Create class directory in split
+            split_class_dir = os.path.join(output_dir, split, class_name)
+            os.makedirs(split_class_dir, exist_ok=True)
+            
+            # Copy assigned instances
+            for instance in split_assignments[split][class_name]:
+                src_path = os.path.join(source_dir, class_name, instance)
+                dst_path = os.path.join(split_class_dir, instance)
+                shutil.copytree(src_path, dst_path)
     
-    for root, dirs, files in os.walk(input_folder):
-        for file in files:
-            if file.endswith(".mp4"):
-                video_paths.append(os.path.join(root, file))
+    return split_assignments
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_single_video, video_path, input_folder, output_base_folder, num_frames)
-                   for video_path in video_paths]
-        
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Exception as exc:
-                print(f"Generated an exception: {exc}")
+def print_split_statistics(split_assignments: Dict[str, Dict[str, List[str]]]):
+    """Print statistics about the dataset split."""
+    print("\nDataset Split Statistics:")
+    print("-" * 50)
+    
+    splits = ['train', 'validation', 'test']
+    total_instances = defaultdict(int)
+    
+    for split in splits:
+        print(f"\n{split.capitalize()} Set:")
+        split_total = 0
+        for class_name, instances in split_assignments[split].items():
+            count = len(instances)
+            split_total += count
+            total_instances[class_name] += count
+            print(f"  {class_name}: {count} instances")
+        print(f"  Total: {split_total} instances")
+    
+    print("\nTotal instances per class:")
+    for class_name, total in total_instances.items():
+        print(f"  {class_name}: {total}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Preprocessing steps that extracts all frames from a video & center crops'
-    )
-    
-    parser.add_argument(
-        '--input_folder',
-        type=str,
-        required=True,
-        help='Path to the video data directory'
-    )
-    
-    parser.add_argument(
-        '--output_base_folder',
-        type=str,
-        required=True,
-        help='Path to the frame data directory'
-    )
-    
-    args = parser.parse_args()
-    
-    process_videos_in_structure(args.input_folder, args.output_base_folder)
+    # Example usage
+    source_directory = "/home/hinhnv/SignLanguage/data_cut_full_frames"
+    output_directory = "/home/hinhnv/SignLanguage/data_83_labels_full_frames"
+
+    # Split the dataset
+    split_info = split_dataset(source_directory, output_directory)
+
+    # Print statistics about the split
+    print_split_statistics(split_info)

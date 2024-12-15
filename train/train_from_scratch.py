@@ -166,13 +166,9 @@ if __name__ == '__main__':
                         help='Batch size')
     parser.add_argument('--num_workers', type=int, default=1,
                         help='Number of workers for data loading')
-    parser.add_argument('--train_data_path_1', type=str,
+    parser.add_argument('--train_data_path', type=str,
                         help='Train data directory')
-    parser.add_argument('--train_data_path_2', type=str,
-                        help='Train data directory')
-    parser.add_argument('--validation_data_path_1', type=str,
-                        help='Validation data directory')
-    parser.add_argument('--validation_data_path_2', type=str,
+    parser.add_argument('--validation_data_path', type=str,
                         help='Validation data directory')
     parser.add_argument('--test_data_path', type=str,
                         help='Number of accumulation steps')
@@ -206,7 +202,7 @@ if __name__ == '__main__':
                                           )
         
         if args.model_path:
-            checkpoint = torch.load(args.model_path)['model_state_dict']
+            checkpoint = torch.load(args.model_path)
             
             del checkpoint['head.weight'], checkpoint['head.bias']
             model.load_state_dict(checkpoint, strict=False)
@@ -275,24 +271,12 @@ if __name__ == '__main__':
     set_all_seeds()
     
     # create dataset & dataloader
-    from utils.prepare_dataset import CustomVideoDataset, FlexibleVideoDataset, MergedFlexibleDataset
+    from utils.prepare_dataset import CustomVideoDataset, FlexibleVideoDataset
     from utils.util import collate_fn
     
-    # train_dataset = CustomVideoDataset(root_dir=args.train_data_path, transform=transformations)
-    # validation_dataset = CustomVideoDataset(root_dir=args.validation_data_path, transform=transformations)
+    train_dataset = FlexibleVideoDataset(root_dir = args.train_data_path, transform = transformations)
+    val_dataset = FlexibleVideoDataset(root_dir = args.train_data_path, transform = transformations)
     
-    train_dataset_1 = FlexibleVideoDataset(root_dir = args.train_data_path_1, transform = transformations, first_idx=10, last_idx_from_end=10)
-    train_dataset = train_dataset_1
-    if args.train_data_path_2:
-        train_dataset_2 = FlexibleVideoDataset(root_dir = args.train_data_path_2, transform = transformations)
-        train_dataset = MergedFlexibleDataset([train_dataset_1, train_dataset_2], balanced = args.class_balance)
-    
-    val_dataset_1 = FlexibleVideoDataset(root_dir = args.validation_data_path_1, transform = transformations, first_idx=10, last_idx_from_end=10)
-    val_dataset = val_dataset_1
-    if args.validation_data_path_2:
-        val_dataset_2 = FlexibleVideoDataset(root_dir = args.validation_data_path_2, transform = transformations)
-        val_dataset = MergedFlexibleDataset([val_dataset_1, val_dataset_2], balanced = args.class_balance)
-        
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     
@@ -301,7 +285,7 @@ if __name__ == '__main__':
     
     # create learning rate scheduler
     if args.scheduler == 'StepLR':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.75)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.75)
     elif args.scheduler == 'CosineAnnealingLR':
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0.001)
     elif args.scheduler == 'ReduceLROnPlateau':

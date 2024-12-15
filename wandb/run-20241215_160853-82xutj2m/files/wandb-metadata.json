@@ -1,0 +1,74 @@
+{
+  "os":  "Linux-6.8.0-49-generic-x86_64-with-glibc2.35",
+  "python":  "3.10.12",
+  "startedAt":  "2024-12-15T16:08:53.904224Z",
+  "args":  [
+    "--model_name",
+    "VideoMAE-v2",
+    "--num_classes",
+    "100",
+    "--num_epochs",
+    "50",
+    "--learning_rate",
+    "0.00015",
+    "--batch_size",
+    "4",
+    "--scheduler",
+    "StepLR",
+    "--model_path",
+    "/workspace/pytorch_gpu/sign_language_code/model_ckpts/VideoMAE-2-base/VideoMAE_v2_base.pth",
+    "--train_data_path",
+    "/workspace/sign-language-data/data_frames/train",
+    "--validation_data_path",
+    "/workspace/sign-language-data/data_frames/val",
+    "--warmup_steps",
+    "0.01",
+    "--save_ckpt_every",
+    "1",
+    "--save_ckpt_dir",
+    "model_ckpts/VideoMAE-v2-base-sl",
+    "--accumulation_steps",
+    "8",
+    "--class_balance",
+    "true",
+    "--device",
+    "cuda:0",
+    "--use_wandb",
+    "true"
+  ],
+  "program":  "-m train.train_from_scratch",
+  "git":  {
+    "remote":  "https://github.com/1-13AM/ss_sign_language.git",
+    "commit":  "51924ea56bb2e355c0068b2268096efec3b0e327"
+  },
+  "email":  "dinhhai1ccg@gmail.com",
+  "root":  "/workspace/pytorch_gpu/sign_language_code",
+  "host":  "2ceb41132ea5",
+  "username":  "root",
+  "executable":  "/usr/local/python/current/bin/python",
+  "cpu_count":  28,
+  "cpu_count_logical":  56,
+  "gpu":  "[]",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "981759803392",
+      "used":  "834721808384"
+    }
+  },
+  "memory":  {
+    "total":  "135031382016"
+  },
+  "cpu":  {
+    "count":  28,
+    "countLogical":  56
+  },
+  "gpu_nvidia":  [
+    {
+      "memoryTotal":  "25757220864",
+      "cudaCores":  16384,
+      "architecture":  "Ada"
+    }
+  ],
+  "cudaVersion":  "12.6"
+}
