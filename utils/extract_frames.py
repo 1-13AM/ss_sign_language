@@ -1,8 +1,9 @@
-import cv2
+import imageio
 import os
 import concurrent.futures
-import tensorflow as tf
+from PIL import Image
 import argparse
+import numpy as np
 
 def center_crop(img, dim):
     """Returns center cropped image.
@@ -23,8 +24,19 @@ def center_crop(img, dim):
 
 def format_frames(frame, output_size):
     frame = center_crop(frame, (1600,1600))
-    frame = tf.image.resize_with_pad(frame, *output_size)
-    return frame.numpy()
+    # Convert numpy array to PIL Image
+    img = Image.fromarray(frame)
+    # Resize with padding to maintain aspect ratio
+    desired_size = output_size[0]  # assuming square output
+    old_size = img.size
+    ratio = float(desired_size)/max(old_size)
+    new_size = tuple([int(x*ratio) for x in old_size])
+    img = img.resize(new_size, Image.LANCZOS)
+    # Create new image with padding
+    new_img = Image.new("RGB", (desired_size, desired_size))
+    new_img.paste(img, ((desired_size-new_size[0])//2,
+                        (desired_size-new_size[1])//2))
+    return np.array(new_img)
 
 def extract_frames_from_video(video_path, output_folder, num_frames=16):
     video_name = os.path.basename(video_path).split('.')[0]
@@ -36,37 +48,39 @@ def extract_frames_from_video(video_path, output_folder, num_frames=16):
             print(f"Skipping {video_path} - frames already extracted")
             return
     
-    cap = cv2.VideoCapture(video_path)
-    
-    if not cap.isOpened():
-        print(f"Error opening video file {video_path}")
+    try:
+        # Open the video file using imageio
+        reader = imageio.get_reader(video_path)
+        
+        # Create output folder for the current video
+        os.makedirs(output_folder, exist_ok=True)
+        
+        # Get total number of frames
+        total_frames = reader.count_frames()
+        step = 1
+        
+        frame_count = 0
+        extracted_count = 0
+        
+        # Iterate through frames
+        for frame in reader:
+            if frame_count % step == 0:
+                frame_file = os.path.join(output_folder, f"{video_name}_frame{extracted_count + 1}.jpg")
+                # Convert frame to BGR format (imageio reads in RGB, but we want to save in BGR)
+                frame_bgr = frame[..., ::-1]  # Convert RGB to BGR
+                frame_processed = format_frames(frame_bgr, (224,224))
+                # Use imageio to write the frame
+                imageio.imwrite(frame_file, frame_processed[..., ::-1])  # Convert back to RGB for saving
+                extracted_count += 1
+            
+            frame_count += 1
+        
+        reader.close()
+        print(f"Successfully extracted {extracted_count} frames from {video_path}")
+        
+    except Exception as e:
+        print(f"Error processing video file {video_path}: {str(e)}")
         return
-    
-    # Create output folder for the current video
-    os.makedirs(output_folder, exist_ok=True)
-    
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    step = 1
-    
-    frame_count = 0
-    extracted_count = 0
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
-        
-        if not ret:
-            break
-        
-        if frame_count % step == 0:
-            frame_file = os.path.join(output_folder, f"{video_name}_frame{extracted_count + 1}.jpg")
-            frame = format_frames(frame, (224,224))
-            cv2.imwrite(frame_file, frame)
-            extracted_count += 1
-        
-        frame_count += 1
-    
-    cap.release()
-    print(f"Successfully extracted {extracted_count} frames from {video_path}")
 
 def process_single_video(video_path, input_folder, output_base_folder, num_frames):
     relative_path = os.path.relpath(video_path, input_folder)
@@ -113,3 +127,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     process_videos_in_structure(args.input_folder, args.output_base_folder)
+    
