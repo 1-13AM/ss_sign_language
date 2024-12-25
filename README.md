@@ -12,8 +12,17 @@ pip install -r requirements.txt
 
 ## Environment Setup
 
-1. Create an `.env` file in the root directory
-2. Add your Weights & Biases API key:
+1. Create an Ananconda environment
+```
+conda create -n signlanguage-env python=3.9
+conda activate signlanguage-env
+```
+2. Install the required packages
+```
+pip install -r requirements.txt
+```
+3. Create an .env file in the root directory.
+4. Add your Weights & Biases API key:
 ```
 WANDB_API_KEY=YOUR_WANDB_API_KEY
 ```
